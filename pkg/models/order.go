@@ -19,7 +19,7 @@ const (
 	Pending   OrderStatus = "PENDING"
 	Filled    OrderStatus = "FILLED"
 	Partial   OrderStatus = "PARTIAL"
-	Cancelled OrderStatus = "CANCELLED"
+	Canceled OrderStatus = "CANCELED"
 	Rejected  OrderStatus = "REJECTED"
 )
 

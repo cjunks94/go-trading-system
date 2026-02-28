@@ -62,7 +62,7 @@ func (ob *OrderBook) CancelOrder(orderID string) bool {
 		return false
 	}
 
-	order.Status = models.Cancelled
+	order.Status = models.Canceled
 	order.UpdatedAt = time.Now()
 	delete(ob.orders, orderID)
 	return true
@@ -87,7 +87,7 @@ func (ob *OrderBook) Match(order *models.Order) []models.Trade {
 		bestOrder := oppositeBook.Peek()
 
 		// Skip cancelled orders
-		if bestOrder.Status == models.Cancelled {
+		if bestOrder.Status == models.Canceled {
 			heap.Pop(oppositeBook)
 			continue
 		}
@@ -162,7 +162,7 @@ func (ob *OrderBook) GetBestBid() (float64, int64) {
 
 	for ob.bids.Len() > 0 {
 		best := ob.bids.Peek()
-		if best.Status != models.Cancelled {
+		if best.Status != models.Canceled {
 			return best.Price, best.RemainingQty()
 		}
 		heap.Pop(ob.bids)
@@ -177,7 +177,7 @@ func (ob *OrderBook) GetBestAsk() (float64, int64) {
 
 	for ob.asks.Len() > 0 {
 		best := ob.asks.Peek()
-		if best.Status != models.Cancelled {
+		if best.Status != models.Canceled {
 			return best.Price, best.RemainingQty()
 		}
 		heap.Pop(ob.asks)
@@ -215,7 +215,7 @@ func aggregateLevels(h *orderHeap, maxLevels int) []PriceLevel {
 	var prices []float64
 
 	for _, order := range h.orders {
-		if order.Status == models.Cancelled {
+		if order.Status == models.Canceled {
 			continue
 		}
 		if pl, exists := levels[order.Price]; exists {

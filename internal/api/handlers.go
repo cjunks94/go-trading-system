@@ -82,10 +82,15 @@ func (h *Handlers) SubmitOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, response)
 
-	// Broadcast order update
-	h.hub.Broadcast(websocket.NewOrderMessage(order))
+	// Broadcast order update (errors logged, not critical)
+	if err := h.hub.Broadcast(websocket.NewOrderMessage(order)); err != nil {
+		// WebSocket broadcast is best-effort, don't fail request
+		_ = err
+	}
 	for _, trade := range trades {
-		h.hub.Broadcast(websocket.NewTradeMessage(trade))
+		if err := h.hub.Broadcast(websocket.NewTradeMessage(trade)); err != nil {
+			_ = err
+		}
 	}
 }
 
@@ -149,7 +154,10 @@ func (h *Handlers) WebSocket(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		// Client may have disconnected, log but don't fail
+		http.Error(w, "encoding error", http.StatusInternalServerError)
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {

@@ -167,7 +167,7 @@ func (e *Engine) CancelOrder(orderID string) error {
 	e.mu.Unlock()
 
 	if book.CancelOrder(orderID) {
-		order.Status = models.Cancelled
+		order.Status = models.Canceled
 		order.UpdatedAt = time.Now()
 		return nil
 	}

@@ -302,8 +302,8 @@ func TestCancelOrder(t *testing.T) {
 		t.Error("expected cancel to succeed")
 	}
 
-	if order.Status != models.Cancelled {
-		t.Errorf("expected status CANCELLED, got %s", order.Status)
+	if order.Status != models.Canceled {
+		t.Errorf("expected status CANCELED, got %s", order.Status)
 	}
 }
 

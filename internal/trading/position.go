@@ -24,51 +24,86 @@ func (pm *PositionManager) UpdateFromTrade(trade models.Trade) *models.Position 
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	pos, exists := pm.positions[trade.Symbol]
+	pos := pm.getOrCreatePosition(trade.Symbol)
+	qty := pm.signedQuantity(trade)
+
+	pm.realizeClosingPL(pos, qty, trade.Price)
+	pm.updatePositionQuantity(pos, qty, trade.Price)
+
+	return pos
+}
+
+// getOrCreatePosition returns existing position or creates new one
+func (pm *PositionManager) getOrCreatePosition(symbol string) *models.Position {
+	pos, exists := pm.positions[symbol]
 	if !exists {
-		pos = &models.Position{Symbol: trade.Symbol}
-		pm.positions[trade.Symbol] = pos
+		pos = &models.Position{Symbol: symbol}
+		pm.positions[symbol] = pos
 	}
+	return pos
+}
 
-	// Calculate position change
-	qty := trade.Quantity
+// signedQuantity converts trade to signed quantity (negative for sells)
+func (pm *PositionManager) signedQuantity(trade models.Trade) int64 {
 	if trade.Side == models.Sell {
-		qty = -qty
+		return -trade.Quantity
+	}
+	return trade.Quantity
+}
+
+// realizeClosingPL calculates and adds realized P&L when closing positions
+func (pm *PositionManager) realizeClosingPL(pos *models.Position, qty int64, price float64) {
+	if !isClosingPosition(pos.Quantity, qty) {
+		return
 	}
 
-	// Check if this trade is closing or opening position
-	if (pos.Quantity > 0 && qty < 0) || (pos.Quantity < 0 && qty > 0) {
-		// Closing position - realize P&L
-		closeQty := min(abs(pos.Quantity), abs(qty))
-		if pos.Quantity > 0 {
-			// Closing long position
-			pos.RealizedPL += float64(closeQty) * (trade.Price - pos.AvgCost)
-		} else {
-			// Closing short position
-			pos.RealizedPL += float64(closeQty) * (pos.AvgCost - trade.Price)
-		}
+	closeQty := min(abs(pos.Quantity), abs(qty))
+	if pos.Quantity > 0 {
+		pos.RealizedPL += float64(closeQty) * (price - pos.AvgCost)
+	} else {
+		pos.RealizedPL += float64(closeQty) * (pos.AvgCost - price)
 	}
+}
 
-	// Update position
+// updatePositionQuantity updates position quantity and average cost
+func (pm *PositionManager) updatePositionQuantity(pos *models.Position, qty int64, price float64) {
 	oldQty := pos.Quantity
 	newQty := oldQty + qty
 
-	if newQty == 0 {
+	switch {
+	case newQty == 0:
 		pos.Quantity = 0
 		pos.AvgCost = 0
-	} else if (oldQty >= 0 && qty > 0) || (oldQty <= 0 && qty < 0) {
-		// Adding to position - update average cost
-		pos.AvgCost = (pos.AvgCost*float64(abs(oldQty)) + trade.Price*float64(abs(qty))) / float64(abs(newQty))
+	case isAddingToPosition(oldQty, qty):
+		pos.AvgCost = weightedAverage(pos.AvgCost, abs(oldQty), price, abs(qty))
 		pos.Quantity = newQty
-	} else {
-		// Partial close with flip
+	default:
 		pos.Quantity = newQty
-		if (oldQty > 0 && newQty < 0) || (oldQty < 0 && newQty > 0) {
-			pos.AvgCost = trade.Price // New position at current price
+		if isFlippingPosition(oldQty, newQty) {
+			pos.AvgCost = price
 		}
 	}
+}
 
-	return pos
+// isClosingPosition returns true if trade reduces position size
+func isClosingPosition(posQty, tradeQty int64) bool {
+	return (posQty > 0 && tradeQty < 0) || (posQty < 0 && tradeQty > 0)
+}
+
+// isAddingToPosition returns true if trade increases position in same direction
+func isAddingToPosition(oldQty, qty int64) bool {
+	return (oldQty >= 0 && qty > 0) || (oldQty <= 0 && qty < 0)
+}
+
+// isFlippingPosition returns true if position changed from long to short or vice versa
+func isFlippingPosition(oldQty, newQty int64) bool {
+	return (oldQty > 0 && newQty < 0) || (oldQty < 0 && newQty > 0)
+}
+
+// weightedAverage calculates weighted average of two values
+func weightedAverage(val1 float64, weight1 int64, val2 float64, weight2 int64) float64 {
+	totalWeight := weight1 + weight2
+	return (val1*float64(weight1) + val2*float64(weight2)) / float64(totalWeight)
 }
 
 // UpdateMarketValue updates unrealized P&L based on current price

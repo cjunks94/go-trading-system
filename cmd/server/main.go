@@ -85,9 +85,13 @@ func main() {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
 
-	engine.Stop()
+	if err := engine.Stop(); err != nil {
+		log.Printf("Engine stop error: %v", err)
+	}
 	hub.Stop()
-	feed.Stop()
+	if err := feed.Stop(); err != nil {
+		log.Printf("Feed stop error: %v", err)
+	}
 
 	log.Println("Server stopped")
 }
@@ -97,6 +101,9 @@ func broadcastQuotes(feed market.Feed, hub *websocket.Hub) {
 	quotes := feed.Subscribe()
 
 	for quote := range quotes {
-		hub.Broadcast(websocket.NewQuoteMessage(quote))
+		if err := hub.Broadcast(websocket.NewQuoteMessage(quote)); err != nil {
+			// Best-effort broadcast, continue on error
+			log.Printf("Broadcast error: %v", err)
+		}
 	}
 }
