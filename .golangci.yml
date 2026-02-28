@@ -21,7 +21,7 @@ linters:
     - unparam       # Find unused parameters
     - nakedret      # Find naked returns
     - prealloc      # Find slice preallocation opportunities
-    - exportloopref # Check for loop variable capture
+    - copyloopvar   # Check for loop variable copies (Go 1.22+)
 
 linters-settings:
   gocyclo:
