@@ -20,7 +20,7 @@ jobs:
 
       - name: Download and build dependencies
         run: |
-          go mod download
+          go mod tidy
           go build ./...
 
       - name: Run golangci-lint
