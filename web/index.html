@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Trading System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .header {
+            background: #16213e;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #0f3460;
+        }
+        .header h1 {
+            color: #00d9ff;
+            font-size: 1.5rem;
+        }
+        .status {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4757;
+        }
+        .status-dot.connected {
+            background: #2ed573;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 1rem;
+            padding: 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        .panel h2 {
+            color: #00d9ff;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #0f3460;
+        }
+        .quotes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+        }
+        .quote-card {
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .quote-card:hover {
+            border-color: #00d9ff;
+        }
+        .quote-card.selected {
+            border-color: #00d9ff;
+            background: #0f3460;
+        }
+        .quote-symbol {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .quote-price {
+            font-size: 1.3rem;
+            margin-bottom: 0.25rem;
+        }
+        .quote-price.up { color: #2ed573; }
+        .quote-price.down { color: #ff4757; }
+        .quote-spread {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .order-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .form-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .form-group {
+            flex: 1;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 0.25rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #eee;
+            font-size: 0.95rem;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .btn-buy {
+            background: #2ed573;
+            color: #000;
+        }
+        .btn-sell {
+            background: #ff4757;
+            color: #fff;
+        }
+        .positions-table, .pnl-summary {
+            width: 100%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        th {
+            color: #888;
+            font-weight: normal;
+        }
+        .positive { color: #2ed573; }
+        .negative { color: #ff4757; }
+        .pnl-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #0f3460;
+        }
+        .pnl-row:last-child {
+            border: none;
+            font-weight: bold;
+        }
+        .trades-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .trade-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #0f3460;
+            font-size: 0.85rem;
+        }
+        .trade-item .buy { color: #2ed573; }
+        .trade-item .sell { color: #ff4757; }
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Go Trading System</h1>
+        <div class="status">
+            <span id="wsStatus">Disconnected</span>
+            <div class="status-dot" id="statusDot"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="panel">
+                <h2>Market Data</h2>
+                <div class="quotes-grid" id="quotesGrid"></div>
+            </div>
+
+            <div class="panel" style="margin-top: 1rem;">
+                <h2>Positions</h2>
+                <table class="positions-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Qty</th>
+                            <th>Avg Cost</th>
+                            <th>Market Value</th>
+                            <th>Unrealized P&L</th>
+                            <th>Realized P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positionsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="panel" style="margin-top: 1rem;">
+                <h2>Recent Trades</h2>
+                <div class="trades-list" id="tradesList"></div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <h2>New Order</h2>
+                <form class="order-form" id="orderForm">
+                    <div class="form-group">
+                        <label>Symbol</label>
+                        <select id="orderSymbol">
+                            <option value="">Select symbol...</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="orderType">
+                                <option value="MARKET">Market</option>
+                                <option value="LIMIT">Limit</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" id="orderQty" value="100" min="1">
+                        </div>
+                    </div>
+                    <div class="form-group" id="priceGroup" style="display: none;">
+                        <label>Price</label>
+                        <input type="number" id="orderPrice" step="0.01" min="0">
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" class="btn-buy" onclick="submitOrder('BUY')">BUY</button>
+                        <button type="button" class="btn-sell" onclick="submitOrder('SELL')">SELL</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="panel" style="margin-top: 1rem;">
+                <h2>P&L Summary</h2>
+                <div class="pnl-summary" id="pnlSummary">
+                    <div class="pnl-row">
+                        <span>Unrealized P&L</span>
+                        <span id="unrealizedPL">$0.00</span>
+                    </div>
+                    <div class="pnl-row">
+                        <span>Realized P&L</span>
+                        <span id="realizedPL">$0.00</span>
+                    </div>
+                    <div class="pnl-row">
+                        <span>Total P&L</span>
+                        <span id="totalPL">$0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let quotes = {};
+        let selectedSymbol = null;
+        let trades = [];
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                document.getElementById('wsStatus').textContent = 'Connected';
+                document.getElementById('statusDot').classList.add('connected');
+            };
+
+            ws.onclose = () => {
+                document.getElementById('wsStatus').textContent = 'Disconnected';
+                document.getElementById('statusDot').classList.remove('connected');
+                setTimeout(connect, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                const lines = event.data.split('\n');
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        try {
+                            const msg = JSON.parse(line);
+                            handleMessage(msg);
+                        } catch (e) {}
+                    }
+                });
+            };
+        }
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'quote':
+                    updateQuote(msg.data);
+                    break;
+                case 'trade':
+                    addTrade(msg.data);
+                    break;
+                case 'position':
+                    updatePositions();
+                    break;
+                case 'order':
+                    break;
+            }
+        }
+
+        function updateQuote(quote) {
+            const prev = quotes[quote.symbol];
+            quotes[quote.symbol] = quote;
+            renderQuotes();
+
+            if (selectedSymbol === quote.symbol) {
+                document.getElementById('orderPrice').value = quote.last.toFixed(2);
+            }
+        }
+
+        function renderQuotes() {
+            const grid = document.getElementById('quotesGrid');
+            const symbols = Object.keys(quotes).sort();
+
+            // Update symbol select
+            const select = document.getElementById('orderSymbol');
+            if (select.options.length <= 1) {
+                symbols.forEach(sym => {
+                    const opt = document.createElement('option');
+                    opt.value = sym;
+                    opt.textContent = sym;
+                    select.appendChild(opt);
+                });
+            }
+
+            grid.innerHTML = symbols.map(sym => {
+                const q = quotes[sym];
+                const prevPrice = q._prevPrice || q.last;
+                const priceClass = q.last > prevPrice ? 'up' : q.last < prevPrice ? 'down' : '';
+                q._prevPrice = q.last;
+
+                return `
+                    <div class="quote-card ${selectedSymbol === sym ? 'selected' : ''}"
+                         onclick="selectSymbol('${sym}')">
+                        <div class="quote-symbol">${sym}</div>
+                        <div class="quote-price ${priceClass}">$${q.last.toFixed(2)}</div>
+                        <div class="quote-spread">
+                            ${q.bid.toFixed(2)} / ${q.ask.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectSymbol(symbol) {
+            selectedSymbol = symbol;
+            document.getElementById('orderSymbol').value = symbol;
+            document.getElementById('orderPrice').value = quotes[symbol]?.last.toFixed(2) || '';
+            renderQuotes();
+        }
+
+        async function submitOrder(side) {
+            const symbol = document.getElementById('orderSymbol').value;
+            const type = document.getElementById('orderType').value;
+            const quantity = parseInt(document.getElementById('orderQty').value);
+            const price = parseFloat(document.getElementById('orderPrice').value) || 0;
+
+            if (!symbol) {
+                alert('Please select a symbol');
+                return;
+            }
+
+            const order = {
+                symbol,
+                side,
+                type,
+                quantity,
+                price: type === 'LIMIT' ? price : undefined
+            };
+
+            try {
+                const res = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(order)
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert(`Order rejected: ${data.error}`);
+                } else {
+                    updatePositions();
+                    updatePnL();
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        function addTrade(trade) {
+            trades.unshift(trade);
+            if (trades.length > 50) trades.pop();
+            renderTrades();
+            updatePositions();
+            updatePnL();
+        }
+
+        function renderTrades() {
+            const list = document.getElementById('tradesList');
+            list.innerHTML = trades.map(t => `
+                <div class="trade-item">
+                    <span class="${t.side.toLowerCase()}">${t.side}</span>
+                    ${t.symbol} ${t.quantity} @ $${t.price.toFixed(2)}
+                </div>
+            `).join('');
+        }
+
+        async function updatePositions() {
+            try {
+                const res = await fetch('/api/positions');
+                const positions = await res.json();
+
+                const tbody = document.getElementById('positionsBody');
+                tbody.innerHTML = positions.map(p => `
+                    <tr>
+                        <td>${p.symbol}</td>
+                        <td>${p.quantity}</td>
+                        <td>$${p.avgCost.toFixed(2)}</td>
+                        <td>$${p.marketValue.toFixed(2)}</td>
+                        <td class="${p.unrealizedPL >= 0 ? 'positive' : 'negative'}">
+                            $${p.unrealizedPL.toFixed(2)}
+                        </td>
+                        <td class="${p.realizedPL >= 0 ? 'positive' : 'negative'}">
+                            $${p.realizedPL.toFixed(2)}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {}
+        }
+
+        async function updatePnL() {
+            try {
+                const res = await fetch('/api/pnl');
+                const pnl = await res.json();
+
+                const formatPL = (val) => {
+                    const cls = val >= 0 ? 'positive' : 'negative';
+                    return `<span class="${cls}">$${val.toFixed(2)}</span>`;
+                };
+
+                document.getElementById('unrealizedPL').innerHTML = formatPL(pnl.totalUnrealizedPL);
+                document.getElementById('realizedPL').innerHTML = formatPL(pnl.totalRealizedPL);
+                document.getElementById('totalPL').innerHTML = formatPL(pnl.totalPL);
+            } catch (err) {}
+        }
+
+        document.getElementById('orderType').addEventListener('change', (e) => {
+            document.getElementById('priceGroup').style.display =
+                e.target.value === 'LIMIT' ? 'block' : 'none';
+        });
+
+        // Initialize
+        connect();
+        setInterval(updatePositions, 1000);
+        setInterval(updatePnL, 1000);
+    </script>
+</body>
+</html>
