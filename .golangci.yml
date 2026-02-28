@@ -49,6 +49,11 @@ issues:
     - path: mock_
       linters:
         - all
+    # Allow math/rand in simulator (crypto-grade randomness not needed for price simulation)
+    - path: feed_simulator\.go
+      linters:
+        - gosec
+      text: "G404"
 
   max-issues-per-linter: 50
   max-same-issues: 10

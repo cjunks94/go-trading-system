@@ -86,7 +86,7 @@ func (ob *OrderBook) Match(order *models.Order) []models.Trade {
 	for order.RemainingQty() > 0 && oppositeBook.Len() > 0 {
 		bestOrder := oppositeBook.Peek()
 
-		// Skip cancelled orders
+		// Skip canceled orders
 		if bestOrder.Status == models.Canceled {
 			heap.Pop(oppositeBook)
 			continue

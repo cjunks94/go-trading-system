@@ -23,6 +23,9 @@ jobs:
           go mod tidy
           go build ./...
 
+      - name: Format code
+        run: go fmt ./...
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
