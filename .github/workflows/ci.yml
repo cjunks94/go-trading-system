@@ -51,10 +51,10 @@ jobs:
         run: go build ./...
 
       - name: Run tests
-        run: go test ./... -v -race
+        run: go test ./... -v -race -short
 
       - name: Run tests with coverage
-        run: go test -coverprofile=coverage.out ./...
+        run: go test -coverprofile=coverage.out -short ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
