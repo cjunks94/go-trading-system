@@ -141,6 +141,54 @@ make coverage
 - **Gorilla Mux**: HTTP router with path variables
 - **Docker**: Multi-stage build for minimal image size
 
+## Deployment
+
+### Branch Strategy
+
+| Branch | Environment | URL |
+|--------|-------------|-----|
+| `master` | Staging | staging.trading.cjunker.dev |
+| `production` | Production | trading.cjunker.dev |
+
+**Promotion flow**: `feature/*` → `master` (staging) → `production` (prod)
+
+### Railway Setup
+
+1. Create a new Railway project
+2. Connect GitHub repository
+3. Create two environments in Railway:
+   - **Staging**: Deploy from `master` branch
+   - **Production**: Deploy from `production` branch
+4. Railway auto-detects Go and uses the Dockerfile
+
+### Environment Variables (Railway)
+
+Railway provides `PORT` automatically. Additional variables:
+
+| Variable | Staging | Production |
+|----------|---------|------------|
+| `LOG_LEVEL` | `debug` | `info` |
+| `MAX_POSITION_SIZE` | `10000` | `10000` |
+| `MAX_DAILY_LOSS` | `50000` | `50000` |
+
+### Promoting to Production
+
+```bash
+# After testing on staging
+git checkout production
+git merge master
+git push origin production
+```
+
+### Rollback
+
+```bash
+# Revert last commit on production
+git checkout production
+git revert HEAD
+git push origin production
+```
+
 ## License
 
 MIT
